@@ -26,19 +26,17 @@
       margin: 0;
       font-family: 'Segoe UI', sans-serif;
       background: linear-gradient(135deg, #fff700, #d4a701);
-      color: #333;
       display: flex;
       flex-direction: column;
       align-items: center;
       min-height: 100vh;
       padding-top: 30px;
+      color: #333;
     }
-
     h1 {
       font-size: 2.5em;
       margin-bottom: 10px;
     }
-
     #namePrompt, #chatContainer {
       background: rgba(255,255,255,0.95);
       padding: 20px;
@@ -48,16 +46,14 @@
       max-width: 440px;
       text-align: center;
     }
-
     #chatBox {
-      height: 300px;
+      height: 320px;
       background: #fcf8b8;
       border-radius: 10px;
       overflow-y: auto;
       padding: 10px;
       margin-bottom: 10px;
     }
-
     input {
       padding: 10px;
       border-radius: 6px;
@@ -66,7 +62,6 @@
       font-size: 14px;
       margin-bottom: 10px;
     }
-
     button {
       padding: 10px 20px;
       margin: 6px 5px;
@@ -77,51 +72,19 @@
       font-weight: bold;
       cursor: pointer;
     }
-
     button:hover {
       background-color: #ffc400;
     }
-
     .message-bubble {
       display: flex;
       align-items: flex-start;
-      background: #fff;
+      background: white;
       border-radius: 12px;
       padding: 10px;
       margin: 6px 0;
       box-shadow: 0 2px 5px rgba(0,0,0,0.05);
       position: relative;
     }
-
-    .message-content {
-      flex: 1;
-    }
-
-    .sender {
-      font-weight: bold;
-      display: block;
-      margin-bottom: 4px;
-    }
-
-    .reply-tag {
-      font-style: italic;
-      font-size: 12px;
-      margin-bottom: 5px;
-      color: #666;
-    }
-
-    .controls {
-      position: absolute;
-      top: 6px;
-      right: 10px;
-      font-size: 16px;
-    }
-
-    .controls span {
-      margin-left: 8px;
-      cursor: pointer;
-    }
-
     .avatar {
       width: 32px;
       height: 32px;
@@ -134,6 +97,28 @@
       display: flex;
       align-items: center;
       justify-content: center;
+      flex-shrink: 0;
+    }
+    .message-content {
+      flex: 1;
+    }
+    .sender {
+      font-weight: bold;
+      display: block;
+      margin-bottom: 4px;
+    }
+    .controls {
+      position: absolute;
+      top: 8px;
+      right: 10px;
+      font-size: 14px;
+    }
+    .controls span {
+      margin-left: 10px;
+      cursor: pointer;
+      background: #eee;
+      padding: 4px 6px;
+      border-radius: 4px;
     }
   </style>
 </head>
@@ -143,21 +128,22 @@
 
 <div id="namePrompt">
   <p>Enter your name:</p>
-  <input type="text" id="nameInput" />
+  <input type="text" id="nameInput" onkeydown="if(event.key==='Enter') enterChat()" />
   <button onclick="enterChat()">Enter</button>
 </div>
 
 <div id="chatContainer" style="display:none;">
   <div id="chatBox"></div>
-  <input type="text" id="messageInput" placeholder="Type your message..." onkeydown="handleEnter(event)" />
+  <input type="text" id="messageInput" placeholder="Type your message..." onkeydown="if(event.key==='Enter') sendMessage()" />
   <button onclick="sendMessage()">Send</button>
   <button onclick="changeName()">Change Name</button>
   <button onclick="deleteAllMessages()">Delete Chat</button>
 </div>
 
+<audio id="notifySound" src="https://www.soundjay.com/button/sounds/button-09.mp3" preload="auto"></audio>
+
 <script>
   let userName = "";
-  let replyingTo = "";
   let listenerAttached = false;
 
   window.onload = () => {
@@ -165,11 +151,8 @@
     if (savedName) {
       userName = savedName;
       document.getElementById("namePrompt").style.display = "none";
-      showChatInterface();
-      appendMessage("System", `Welcome back, ${userName}!`);
-      attachListener();
-    } else {
-      document.getElementById("namePrompt").style.display = "block";
+      document.getElementById("chatContainer").style.display = "block";
+      attachListeners();
     }
   };
 
@@ -179,41 +162,35 @@
     userName = input;
     localStorage.setItem("sodioUserName", userName);
     document.getElementById("namePrompt").style.display = "none";
-    showChatInterface();
-    appendMessage("System", `Welcome, ${userName}!`);
-    attachListener();
-  }
-
-  function showChatInterface() {
     document.getElementById("chatContainer").style.display = "block";
+    attachListeners();
   }
 
-  function attachListener() {
+  function attachListeners() {
     if (listenerAttached) return;
     listenerAttached = true;
-    db.ref("messages").on("child_added", snapshot => {
-      const data = snapshot.val();
-      createBubble(snapshot.key, data.name, data.text, data.reply);
+    db.ref("messages").on("child_added", snap => {
+      renderBubble(snap.key, snap.val());
+      if (snap.val().name !== userName) {
+        document.getElementById("notifySound").play();
+      }
+    });
+    db.ref("messages").on("child_changed", snap => {
+      const msg = document.getElementById(snap.key);
+      if (msg) msg.querySelector(".text").textContent = snap.val().text;
+    });
+    db.ref("messages").on("child_removed", snap => {
+      const msg = document.getElementById(snap.key);
+      if (msg) msg.remove();
     });
   }
 
   function sendMessage() {
-    const msgInput = document.getElementById("messageInput");
-    const message = msgInput.value.trim();
-    if (!message || !userName) return;
-
-    db.ref("messages").push({
-      name: userName,
-      text: message,
-      reply: replyingTo || null
-    });
-
-    msgInput.value = "";
-    replyingTo = "";
-  }
-
-  function handleEnter(e) {
-    if (e.key === "Enter") sendMessage();
+    const input = document.getElementById("messageInput");
+    const text = input.value.trim();
+    if (!text) return;
+    db.ref("messages").push({ name: userName, text });
+    input.value = "";
   }
 
   function changeName() {
@@ -221,53 +198,52 @@
     if (newName) {
       userName = newName.trim();
       localStorage.setItem("sodioUserName", userName);
-      appendMessage("System", `You changed your name to ${userName}`);
     }
   }
 
   function deleteAllMessages() {
     const code = prompt("Enter the delete code:");
     if (code === "sodiodeletechat") {
-      db.ref("messages").remove().then(() => {
-        document.getElementById("chatBox").innerHTML = "";
-        appendMessage("System", "Chat history deleted.");
-      }).catch(err => {
-        appendMessage("System", "Error deleting messages: " + err.message);
-      });
+      db.ref("messages").remove();
+      document.getElementById("chatBox").innerHTML = "";
     } else {
-      appendMessage("System", "Incorrect code. Chat was not deleted.");
+      alert("Incorrect code.");
     }
   }
 
-  function appendMessage(sender, message) {
-    const chatBox = document.getElementById("chatBox");
+  function renderBubble(key, data) {
     const bubble = document.createElement("div");
     bubble.className = "message-bubble";
+    bubble.id = key;
     bubble.innerHTML = `
-      <div class="avatar">${sender.charAt(0).toUpperCase()}</div>
+      <div class="avatar">${data.name.charAt(0).toUpperCase()}</div>
       <div class="message-content">
-        <span class="sender">${sender}:</span> ${message}
+        <span class="sender">${data.name}:</span>
+        <span class="text">${data.text}</span>
       </div>
+      ${data.name === userName ? `
+        <div class="controls">
+          <span onclick="editMessage('${key}')">✏️</span>
+          <span onclick="deleteMessage('${key}')">🗑️</span>
+        </div>` : ""}
     `;
-    chatBox.appendChild(bubble);
-    chatBox.scrollTop = chatBox.scrollHeight;
+    document.getElementById("chatBox").appendChild(bubble);
+    document.getElementById("chatBox").scrollTop = 9999;
   }
 
-  function createBubble(key, sender, message, replyText) {
-    const chatBox = document.getElementById("chatBox");
-    const bubble = document.createElement("div");
-    bubble.className = "message-bubble";
+  function editMessage(key) {
+    const bubble = document.getElementById(key);
+    const currentText = bubble.querySelector(".text").textContent;
+    const newText = prompt("Edit your message:", currentText);
+    if (newText !== null) {
+      db.ref("messages/" + key).update({ text: newText });
+    }
+  }
 
-    const avatar = `<div class="avatar">${sender.charAt(0).toUpperCase()}</div>`;
-    const replyHTML = replyText ? `<div class="reply-tag">↪ ${replyText}</div>` : "";
+  function deleteMessage(key) {
+    db.ref("messages/" + key).remove();
+  }
+</script>
 
-    const content = `
-      <div class="message-content">
-        <span class="sender">${sender}:</span>
-        ${replyHTML}
-        ${message}
-      </div>
-    `;
-
-    const controls = document.createElement("div");
-    controls.className = "controls
+</body>
+</html>
