@@ -3,8 +3,6 @@
 <head>
   <meta charset="UTF-8" />
   <title>SODIO DEVS</title>
-
-  <!-- Firebase Setup -->
   <script src="https://www.gstatic.com/firebasejs/10.4.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.4.0/firebase-database-compat.js"></script>
   <script>
@@ -20,105 +18,111 @@
     firebase.initializeApp(firebaseConfig);
     const db = firebase.database();
   </script>
-
   <style>
     body {
       margin: 0;
       font-family: 'Segoe UI', sans-serif;
-      background: linear-gradient(135deg, #fff700, #d4a701);
+      background: #000;
+      background-image: radial-gradient(white 1px, transparent 1px),
+                        radial-gradient(white 1px, transparent 1px);
+      background-size: 80px 80px;
+      background-position: 0 0, 40px 40px;
+      color: #eee;
       display: flex;
       flex-direction: column;
       align-items: center;
       min-height: 100vh;
       padding-top: 30px;
-      color: #333;
     }
     h1 {
       font-size: 2.5em;
       margin-bottom: 10px;
+      color: white;
+      text-shadow: 0 0 4px #fff;
     }
     #namePrompt, #chatContainer {
-      background: rgba(255,255,255,0.95);
+      background: rgba(255,255,255,0.08);
       padding: 20px;
       border-radius: 12px;
-      box-shadow: 0 0 10px rgba(0,0,0,0.1);
       width: 90%;
-      max-width: 440px;
+      max-width: 600px;
       text-align: center;
     }
     #chatBox {
-      height: 320px;
-      background: #fcf8b8;
+      height: 400px;
+      background: rgba(255,255,255,0.1);
       border-radius: 10px;
       overflow-y: auto;
       padding: 10px;
       margin-bottom: 10px;
+      width: 100%;
     }
     input {
-      padding: 10px;
+      padding: 12px;
       border-radius: 6px;
-      border: 1px solid #ccc;
+      border: none;
       width: 80%;
-      font-size: 14px;
+      font-size: 16px;
       margin-bottom: 10px;
+      background: rgba(255,255,255,0.2);
+      color: white;
     }
     button {
-      padding: 10px 20px;
+      padding: 12px 24px;
       margin: 6px 5px;
       border-radius: 6px;
       border: none;
-      background-color: #ffd100;
-      color: #333;
+      background-color: #444;
+      color: #fff;
       font-weight: bold;
       cursor: pointer;
     }
     button:hover {
-      background-color: #ffc400;
+      background-color: #666;
     }
     .message-bubble {
       display: flex;
-      align-items: flex-start;
-      background: white;
+      flex-direction: column;
+      background: rgba(255,255,255,0.1);
       border-radius: 12px;
-      padding: 10px;
-      margin: 6px 0;
-      box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+      padding: 16px;
+      margin: 10px 0;
       position: relative;
+      width: 100%;
     }
     .avatar {
-      width: 32px;
-      height: 32px;
-      background: #ffeb3b;
+      width: 36px;
+      height: 36px;
+      background: #eee;
+      color: #222;
       border-radius: 50%;
-      margin-right: 10px;
-      font-size: 18px;
       font-weight: bold;
-      color: #333;
       display: flex;
       align-items: center;
       justify-content: center;
-      flex-shrink: 0;
-    }
-    .message-content {
-      flex: 1;
+      margin-bottom: 5px;
     }
     .sender {
       font-weight: bold;
-      display: block;
-      margin-bottom: 4px;
+      font-size: 16px;
+    }
+    .text {
+      margin-top: 6px;
+      font-size: 15px;
     }
     .controls {
       position: absolute;
-      top: 8px;
-      right: 10px;
+      right: 12px;
+      top: 12px;
       font-size: 14px;
     }
     .controls span {
-      margin-left: 10px;
+      margin-left: 6px;
       cursor: pointer;
-      background: #eee;
-      padding: 4px 6px;
+      background: #333;
+      padding: 3px 6px;
       border-radius: 4px;
+      color: white;
     }
   </style>
 </head>
@@ -128,57 +132,52 @@
 
 <div id="namePrompt">
   <p>Enter your name:</p>
-  <input type="text" id="nameInput" onkeydown="if(event.key==='Enter') enterChat()" />
+  <input type="text" id="nameInput" />
   <button onclick="enterChat()">Enter</button>
 </div>
 
 <div id="chatContainer" style="display:none;">
   <div id="chatBox"></div>
-  <input type="text" id="messageInput" placeholder="Type your message..." onkeydown="if(event.key==='Enter') sendMessage()" />
+  <input type="text" id="messageInput" placeholder="Type your message..." />
   <button onclick="sendMessage()">Send</button>
   <button onclick="changeName()">Change Name</button>
   <button onclick="deleteAllMessages()">Delete Chat</button>
 </div>
 
-<audio id="notifySound" src="https://www.soundjay.com/button/sounds/button-09.mp3" preload="auto"></audio>
-
 <script>
   let userName = "";
   let listenerAttached = false;
 
-  window.onload = () => {
-    const savedName = localStorage.getItem("sodioUserName");
-    if (savedName) {
-      userName = savedName;
-      document.getElementById("namePrompt").style.display = "none";
-      document.getElementById("chatContainer").style.display = "block";
-      attachListeners();
-    }
-  };
-
   function enterChat() {
-    const input = document.getElementById("nameInput").value.trim();
-    if (!input) return;
-    userName = input;
+    const val = document.getElementById("nameInput").value.trim();
+    if (!val) return;
+    userName = val;
     localStorage.setItem("sodioUserName", userName);
     document.getElementById("namePrompt").style.display = "none";
     document.getElementById("chatContainer").style.display = "block";
     attachListeners();
   }
 
+  window.onload = () => {
+    const saved = localStorage.getItem("sodioUserName");
+    if (saved) {
+      userName = saved;
+      document.getElementById("namePrompt").style.display = "none";
+      document.getElementById("chatContainer").style.display = "block";
+      attachListeners();
+    }
+    // Ensure the name prompt is visible if not logged in
+    else {
+      document.getElementById("namePrompt").style.display = "block";
+      document.getElementById("chatContainer").style.display = "none";
+    }
+  };
+
   function attachListeners() {
     if (listenerAttached) return;
     listenerAttached = true;
-    db.ref("messages").on("child_added", snap => {
-      renderBubble(snap.key, snap.val());
-      if (snap.val().name !== userName) {
-        document.getElementById("notifySound").play();
-      }
-    });
-    db.ref("messages").on("child_changed", snap => {
-      const msg = document.getElementById(snap.key);
-      if (msg) msg.querySelector(".text").textContent = snap.val().text;
-    });
+    db.ref("messages").on("child_added", snap => renderMessage(snap.key, snap.val()));
+    db.ref("messages").on("child_changed", snap => updateMessage(snap.key, snap.val()));
     db.ref("messages").on("child_removed", snap => {
       const msg = document.getElementById(snap.key);
       if (msg) msg.remove();
@@ -188,9 +187,46 @@
   function sendMessage() {
     const input = document.getElementById("messageInput");
     const text = input.value.trim();
-    if (!text) return;
+    if (!text || !userName) return;
     db.ref("messages").push({ name: userName, text });
     input.value = "";
+  }
+
+  function renderMessage(key, data) {
+    const bubble = document.createElement("div");
+    bubble.className = "message-bubble";
+    bubble.id = key;
+    bubble.innerHTML = `
+      <div class="avatar">${data.name.charAt(0).toUpperCase()}</div>
+      <div class="sender">${data.name}:</div>
+      <div class="text">${data.text}</div>
+      <div class="controls">
+        ${data.name === userName ? `
+          <span onclick="editMessage('${key}')">✏️</span>
+          <span onclick="deleteMessage('${key}')">🗑️</span>
+        ` : ""}
+      </div>
+    `;
+    document.getElementById("chatBox").appendChild(bubble);
+    document.getElementById("chatBox").scrollTop = 9999;
+  }
+
+  function updateMessage(key, data) {
+    const bubble = document.getElementById(key);
+    if (bubble) bubble.querySelector(".text").textContent = data.text;
+  }
+
+  function editMessage(key) {
+    const bubble = document.getElementById(key);
+    const currentText = bubble.querySelector(".text").textContent;
+    const newText = prompt("Edit your message:", currentText);
+    if (newText !== null) {
+      db.ref("messages/" + key).update({ text: newText });
+    }
+  }
+
+  function deleteMessage(key) {
+    db.ref("messages/" + key).remove();
   }
 
   function changeName() {
@@ -209,39 +245,6 @@
     } else {
       alert("Incorrect code.");
     }
-  }
-
-  function renderBubble(key, data) {
-    const bubble = document.createElement("div");
-    bubble.className = "message-bubble";
-    bubble.id = key;
-    bubble.innerHTML = `
-      <div class="avatar">${data.name.charAt(0).toUpperCase()}</div>
-      <div class="message-content">
-        <span class="sender">${data.name}:</span>
-        <span class="text">${data.text}</span>
-      </div>
-      ${data.name === userName ? `
-        <div class="controls">
-          <span onclick="editMessage('${key}')">✏️</span>
-          <span onclick="deleteMessage('${key}')">🗑️</span>
-        </div>` : ""}
-    `;
-    document.getElementById("chatBox").appendChild(bubble);
-    document.getElementById("chatBox").scrollTop = 9999;
-  }
-
-  function editMessage(key) {
-    const bubble = document.getElementById(key);
-    const currentText = bubble.querySelector(".text").textContent;
-    const newText = prompt("Edit your message:", currentText);
-    if (newText !== null) {
-      db.ref("messages/" + key).update({ text: newText });
-    }
-  }
-
-  function deleteMessage(key) {
-    db.ref("messages/" + key).remove();
   }
 </script>
 
